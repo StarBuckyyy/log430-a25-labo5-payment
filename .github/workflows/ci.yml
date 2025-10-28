@@ -1,0 +1,45 @@
+name: CI/CD for Payment Service
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-test-and-deploy:
+    name: Build, Test and Deploy
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Create .env file for testing
+      run: |
+        echo "DB_HOST=127.0.0.1" > .env
+        echo "DB_PORT=3306" >> .env
+        echo "DB_USER=labo05" >> .env
+        echo "DB_PASSWORD=labo05" >> .env
+        echo "DB_NAME=labo05_payments_db" >> .env
+
+    - name: Start services for tests
+      run: docker compose up -d mysql_payments
+
+    - name: Stop test services
+      if: always()
+      run: docker compose down
+
+    - name: Deploy new version to VM
+      if: success()
+      run: |
+        echo "✅ Deploying new version of payment service..."
+        docker compose up -d --build

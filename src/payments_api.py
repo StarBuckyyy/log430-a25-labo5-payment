@@ -4,6 +4,7 @@ SPDX - License - Identifier: LGPL - 3.0 - or -later
 Auteurs : Gabriel C. Ullmann, Fabio Petrillo, 2025
 """
 from flask import Flask, request, jsonify
+import requests
 from controllers.payment_controller import add_payment, process_payment, get_payment
 
 app = Flask(__name__)
@@ -31,6 +32,27 @@ def post_process_payment(payment_id):
     try:
         credit_card_data = request.get_json() or {}
         result = process_payment(payment_id, credit_card_data)
+        
+        # Notifier le Store Manager que le paiement est complété
+        try:
+            update_response = requests.put(
+                'http://api-gateway:8080/store-api/orders',
+                json={
+                    "order_id": result['order_id'],
+                    "is_paid": True
+                },
+                headers={'Content-Type': 'application/json'},
+                timeout=5
+            )
+            
+            if update_response.ok:
+                print(f"✅ Commande {result['order_id']} mise à jour dans Store Manager")
+            else:
+                print(f"❌ Erreur lors de la mise à jour de la commande: {update_response.status_code}")
+                
+        except Exception as e:
+            print(f"❌ Exception lors de la mise à jour de la commande: {e}")
+        
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
